@@ -2,15 +2,33 @@
 
 namespace App\Entity;
 
-use App\Repository\UserRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use App\Repository\UserRepository;
+use Doctrine\Common\Collections\Collection;
+use ApiPlatform\Core\Annotation\ApiResource;
+use ApiPlatform\Core\Annotation\ApiSubresource;
+use Doctrine\Common\Collections\ArrayCollection;
+use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 /**
  * @ORM\Entity(repositoryClass=UserRepository::class)
  * @ORM\Table(name="`user`")
+ * @UniqueEntity("email",message="L'adresse email est déjà utilisé.")
+ * @ApiResource(
+ *      collectionOperations={"GET","POST"},
+ *      itemOperations= {"GET", "PUT", "DELETE"},
+ *      subresourceOperations={
+ *              "posts_get_subresource"={
+ *                  "path"="/blogeur/{id}/articles"
+ *              }
+ * },
+ *      normalizationContext = {
+ *          "groups"={"user_read"}
+ * })
+ * 
  */
 class User implements UserInterface
 {
@@ -18,40 +36,99 @@ class User implements UserInterface
      * @ORM\Id
      * @ORM\GeneratedValue
      * @ORM\Column(type="integer")
+     * @Groups({"posts_read","user_read"})
      */
     private $id;
 
     /**
      * @ORM\Column(type="string", length=180, unique=true)
+     * @Groups({"posts_read","user_read"})
+     * @Assert\NotBlank(
+     *      message="L'email est obligatoire pour s'incrire."
+     * )
+     * @Assert\Email(
+     *      message="Veuillez renseigner un e-mail correct."
+     * )
      */
     private $email;
 
     /**
      * @ORM\Column(type="json")
      */
-    private $roles = [];
+    private $roles = ['ROLE_USER'];
 
     /**
      * @var string The hashed password
      * @ORM\Column(type="string")
+     * @Assert\NotBlank(
+     *      message="Le mot de passe est obligatoire."
+     * )
+     * @Assert\Length(
+     *      min=6,
+     *      minMessage="Le mot de passe doit faire 6 caractères minimum."
+     * )
      */
     private $password;
 
     /**
      * @ORM\OneToMany(targetEntity=Post::class, mappedBy="author", cascade={"persist", "remove"})
+     * @Groups({"user_read"})
+     * @ApiSubresource()
      */
     private $posts;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Groups({"posts_read","user_read"})
+     * @Assert\NotBlank(
+     *      message="Le pseudo est obligatoire."
+     * )
      */
-    private $username;
+    private $pseudo;
+
+    /**
+     * @ORM\Column(type="string", length=255)
+     * @Groups({"posts_read","user_read"})
+     * @Assert\NotBlank(
+     *      message="Le nom de famille est obligatoire."
+     * )
+     * @Assert\Length(
+     *      min=3,
+     *      minMessage="Votre nom de famille doit faire 3 caractères minimum."
+     * )
+     */
+    private $lastname;
+
+    /**
+     * @ORM\Column(type="string", length=255)
+     * @Groups({"posts_read","user_read"})
+     * @Assert\NotBlank(
+     *      message="Le prénom est obligatoire."
+     * )
+     * @Assert\Length(
+     *      min=3,
+     *      minMessage="Votre prénom doit faire 3 caractères minimum."
+     * )
+     */
+    private $firstname;
 
     public function __construct()
     {
         $this->posts = new ArrayCollection();
     }
 
+    /**
+     * Permet de compter le nombre de post écrit par un utilisateur
+     * @Groups({"user_read"})
+     * @return integer
+     */
+    public function getTotalPost(): int {
+
+        $countPosts = count($this->posts->toArray());
+
+        return  $countPosts;
+    }
+    
     public function getId(): ?int
     {
         return $this->id;
@@ -163,9 +240,38 @@ class User implements UserInterface
         return $this;
     }
 
-    public function setUsername(string $username): self
+    public function setPseudo(string $pseudo): self
     {
-        $this->username = $username;
+        $this->pseudo = $pseudo;
+
+        return $this;
+    }
+
+    public function getPseudo(): ?string
+    {
+        return $this->pseudo;
+    }
+
+    public function getLastname(): ?string
+    {
+        return $this->lastname;
+    }
+
+    public function setLastname(string $lastname): self
+    {
+        $this->lastname = $lastname;
+
+        return $this;
+    }
+
+    public function getFirstname(): ?string
+    {
+        return $this->firstname;
+    }
+
+    public function setFirstname(string $firstname): self
+    {
+        $this->firstname = $firstname;
 
         return $this;
     }
